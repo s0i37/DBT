@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define VERSION "0.11"
+#define VERSION "0.12"
 #define MAX_OPCODE_SIZE 15
 
 
@@ -32,7 +32,7 @@ int phys_mem_after_write(CPUState *env, target_ulong pc, target_ulong addr, targ
 bool init_plugin(void *);
 void uninit_plugin(void *);
 
-int ins_count;
+long long int ins_count;
 FILE * out_file;
 uint64_t asid = 0;
 uint64_t from = 0;
@@ -89,7 +89,8 @@ int exec_callback(CPUState *env, target_ulong pc)
 		return 0;
 	if( (from == 0 && to == 0) || ((unsigned int)pc >= from && (unsigned int)pc <= to) )
 	{
-		fprintf( out_file, "0x%08x:0x%x {", (unsigned int)pc, ( (struct X86CPU *)cpu )->thread_id );
+		ins_count++;
+		fprintf( out_file, "%lli:0x%08x:0x%x {", ins_count, (unsigned int)pc, ( (struct X86CPU *)cpu )->thread_id );
 		panda_virtual_memory_read(env, pc, buf, MAX_OPCODE_SIZE+1);
 		for(i = 0; i < MAX_OPCODE_SIZE; i++)
 			fprintf( out_file, "%02X", ( (unsigned char *)buf )[i] );
@@ -103,9 +104,9 @@ int exec_callback(CPUState *env, target_ulong pc)
 			(unsigned int)( (CPUX86State *)cpu )->regs[R_ESI], 
 			(unsigned int)( (CPUX86State *)cpu )->regs[R_EDI]
 		);
-		ins_count++;
+		
 		if( ins_count % 1000000 == 0 )
-			printf( "ins_count: %d M\n", ins_count/1000000 );
+			printf( "ins_count: %lld M\n", ins_count/1000000 );
 	}
 		/*(unsigned int)( (CPUX86State *)cpu )->cr[0], 
 		(unsigned int)( (CPUX86State *)cpu )->cr[1], 
@@ -126,7 +127,8 @@ int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulon
 		return 0;
 	if( (from == 0 && to == 0) || ((unsigned int)pc >= from && (unsigned int)pc <= to) )
 	{
-		fprintf( out_file, "0x%08x:0x%x [0x%08x] -> ", 
+		fprintf( out_file, "%lli:0x%08x:0x%x [0x%08x] -> ",
+			ins_count,
 			(unsigned int)pc,
 			( (struct X86CPU *)cpu )->thread_id,
 			(unsigned int)addr );
@@ -160,7 +162,8 @@ int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulo
 		return 0;
 	if( (from == 0 && to == 0) || ((unsigned int)pc >= from && (unsigned int)pc <= to) )
 	{
-		fprintf( out_file, "0x%08x:0x%x [0x%08x] <- ", 
+		fprintf( out_file, "%lli:0x%08x:0x%x [0x%08x] <- ",
+			ins_count,
 			(unsigned int)pc,
 			( (struct X86CPU *)cpu )->thread_id,
 			(unsigned int)addr );
@@ -207,9 +210,9 @@ bool init_plugin(void *self)
 		printf("[+] from: 0x%08lx, to: 0x%08lx\n", from, to);
 
 	out_file = fopen(out_file_name, "w");
-	fprintf(out_file, "EIP:THREAD_ID {OPCODE} EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI\n");
-	fprintf(out_file, "EIP:THREAD_ID [MEMORY] -> READED_VALUE\n");
-	fprintf(out_file, "EIP:THREAD_ID [MEMORY] <- WRITED_VALUE\n");
+	fprintf(out_file, "TAKT:EIP:THREAD_ID {OPCODE} EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI\n");
+	fprintf(out_file, "TAKT:EIP:THREAD_ID [MEMORY] -> READED_VALUE\n");
+	fprintf(out_file, "TAKT:EIP:THREAD_ID [MEMORY] <- WRITED_VALUE\n");
 
 	pcb.insn_translate = translate_callback;
 	panda_register_callback(self, PANDA_CB_INSN_TRANSLATE, pcb);
