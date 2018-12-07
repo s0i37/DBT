@@ -44,14 +44,18 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
                                uint64_t data1, uint64_t data2,
                                const TranslationBlock* tb)
 {
+    CPUArchState *cpu = tpi_current_cpu_arch(tpi);
+    
+    if((unsigned int) ( (CPUX86State *)cpu )->cr[3] != 0x00a2f000)  /* just kernel */
+      return;
+    
     ins_count++;
-    if(ins_count%1000000 != 0)
+    if(ins_count%10000 != 0)
       return;
 
     if(count)
       fprintf(tpi->output, "0x%08x: %s %s\n", insn->address, insn->mnemonic, insn->op_str);
     fprintf(tpi->output, "EIP: 0x%08lx\n", address);
-    CPUArchState *cpu = tpi_current_cpu_arch(tpi);
     fprintf(tpi->output, "EAX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EAX] );
     fprintf(tpi->output, "ECX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_ECX] );
     fprintf(tpi->output, "EDX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EDX] );
@@ -60,10 +64,10 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
     fprintf(tpi->output, "EBP: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EBP] );
     fprintf(tpi->output, "ESI: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_ESI] );
     fprintf(tpi->output, "EDI: 0x%08x\n", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EDI] );
-    fprintf(tpi->output, "CR1: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[0] );
-    fprintf(tpi->output, "CR2: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[1] );
-    fprintf(tpi->output, "CR3: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[2] );
-    fprintf(tpi->output, "CR4: 0x%08x\n", (unsigned int) ( (CPUX86State *)cpu )->cr[3] );
+    fprintf(tpi->output, "CR0: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[0] );
+    fprintf(tpi->output, "CR2: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[2] );
+    fprintf(tpi->output, "CR3: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[3] );
+    fprintf(tpi->output, "CR4: 0x%08x\n", (unsigned int) ( (CPUX86State *)cpu )->cr[4] );
     fprintf(tpi->output, "================================================================\n");
     //sleep(1);
 }
