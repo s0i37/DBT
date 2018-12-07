@@ -10,7 +10,7 @@ make CFLAGS='-g -w'
 
 cp test.c path/to/qemu/tcg/plugins/
 
-make M=tcg
+make M=tcg LDFLAGS='-lcapstone -shared'
 
 path/to/qemu/x86_64-softmmu/qemu-system-x86_64 -hda disk.qcow2 --tcg-plugin test
 
