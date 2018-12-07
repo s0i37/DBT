@@ -53,6 +53,9 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
     if(ins_count%10000 != 0)
       return;
 
+    /* also we can change current CPU state - leads to BSOD of course */
+    //( (CPUX86State *)cpu )->regs[R_EAX] = 0x13371337;
+
     if(count)
       fprintf(tpi->output, "0x%08x: %s %s\n", insn->address, insn->mnemonic, insn->op_str);
     fprintf(tpi->output, "EIP: 0x%08lx\n", address);
