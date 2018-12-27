@@ -39,6 +39,8 @@ cs_insn *insn;
 size_t count = 0;
 uint64_t ins_count = 0;
 
+unsigned int is_saved = 0;
+
 static void pre_tb_helper_code(const TCGPluginInterface *tpi,
                                TPIHelperInfo info, uint64_t address,
                                uint64_t data1, uint64_t data2,
@@ -46,9 +48,10 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
 {
     CPUArchState *cpu = tpi_current_cpu_arch(tpi);
     
-    if((unsigned int) ( (CPUX86State *)cpu )->cr[3] != 0x00a2f000)  /* just kernel */
+    if((unsigned int) ( (CPUX86State *)cpu )->cr[3] != 0x00a2f000)  /* just kernel, for example */
       return;
-    
+
+
     ins_count++;
     if(ins_count%10000 != 0)
       return;
@@ -58,7 +61,7 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
 
     if(count)
       fprintf(tpi->output, "0x%08x: %s %s\n", insn->address, insn->mnemonic, insn->op_str);
-    fprintf(tpi->output, "EIP: 0x%08lx\n", address);
+    fprintf(tpi->output, "EIP: 0x%08lx\n", (unsigned int) ( (CPUX86State *)cpu )->eip);
     fprintf(tpi->output, "EAX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EAX] );
     fprintf(tpi->output, "ECX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_ECX] );
     fprintf(tpi->output, "EDX: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->regs[R_EDX] );
@@ -72,7 +75,6 @@ static void pre_tb_helper_code(const TCGPluginInterface *tpi,
     fprintf(tpi->output, "CR3: 0x%08x ", (unsigned int) ( (CPUX86State *)cpu )->cr[3] );
     fprintf(tpi->output, "CR4: 0x%08x\n", (unsigned int) ( (CPUX86State *)cpu )->cr[4] );
     fprintf(tpi->output, "================================================================\n");
-    //sleep(1);
 }
 
 /*
@@ -114,3 +116,7 @@ void tpi_init(TCGPluginInterface *tpi)
     tpi->after_gen_opc = after_gen_opc;
     tpi->cpus_stopped = cpus_stopped;
 }
+
+
+/* see tcg/tcg-plugin.inc.c */
+/* good example tcg/plugins/dyncount.c */
