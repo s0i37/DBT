@@ -5,28 +5,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define VERSION "0.12"
+#define VERSION "0.13"
 #define MAX_OPCODE_SIZE 15
 
 
 bool translate_callback(CPUState *env, target_ulong pc);
 int exec_callback(CPUState *env, target_ulong pc);
-int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
-int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
+int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
+int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
 
 /*======POSSIBLE CALLBACKS======
 bool translate_callback(CPUState *env, target_ulong pc);
 int exec_callback(CPUState *env, target_ulong pc);
 
 int virt_mem_before_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size);
-int virt_mem_before_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
-int virt_mem_after_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
-int virt_mem_after_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
+int virt_mem_before_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
+int virt_mem_after_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
+int virt_mem_after_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
 
 int phys_mem_before_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size);
-int phys_mem_before_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
-int phys_mem_after_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
-int phys_mem_after_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf);
+int phys_mem_before_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
+int phys_mem_after_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
+int phys_mem_after_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value);
 */
 
 bool init_plugin(void *);
@@ -37,6 +37,8 @@ FILE * out_file;
 uint64_t asid = 0;
 uint64_t from = 0;
 uint64_t to = 0;
+uint64_t near_bytes = 0;
+uint8_t *near_bytes_buf = 0;
 
 /*
 uint64_t asids[100];
@@ -118,7 +120,7 @@ int exec_callback(CPUState *env, target_ulong pc)
 	return 0;
 }
 
-int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf)
+int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value)
 {
 #ifdef TARGET_I386
 	//CPUState * cpu = first_cpu;
@@ -135,25 +137,38 @@ int virt_mem_read(CPUState *env, target_ulong pc, target_ulong addr, target_ulon
 		switch( (unsigned int)size )
 		{
 			case 1:
-				fprintf( out_file, "0x%02x\n", *(unsigned char *)buf );
+				fprintf( out_file, "0x%02x\n", *(unsigned char *)value );
 				break;
 			case 2:
-				fprintf( out_file, "0x%04x\n", *(unsigned short *)buf );
+				fprintf( out_file, "0x%04x\n", *(unsigned short *)value );
 				break;
 			case 4:
-				fprintf( out_file, "0x%08x\n", *(unsigned int *)buf );
+				fprintf( out_file, "0x%08x\n", *(unsigned int *)value );
 				break;
 			case 8:
-				fprintf( out_file, "0x%08x", *(unsigned int *)buf );
-				fprintf( out_file, "%08x\n", *( ((unsigned int *)buf) + 1 ) );
+				fprintf( out_file, "0x%08x", *(unsigned int *)value );
+				fprintf( out_file, "%08x\n", *( ((unsigned int *)value) + 1 ) );
 				break;
+		}
+
+		if(near_bytes)
+		{
+			panda_virtual_memory_read(env, value-near_bytes, near_bytes_buf, near_bytes*2);
+			fprintf( out_file, "%lli:0x%08x:0x%x [0x%08x]: ", 
+				ins_count,
+				(unsigned int)pc,
+				( (struct X86CPU *)cpu )->thread_id,
+				(unsigned int) (addr-near_bytes) );
+			for(unsigned int i = 0; i < near_bytes*2; i++)
+				fprintf( out_file, "%02X", *(unsigned char *)(value-near_bytes+i) );
+			fprintf(out_file, "\n");
 		}
 	}
 #endif
 	return 0;
 }
 
-int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *buf)
+int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulong size, void *value)
 {
 #ifdef TARGET_I386
 	//CPUState * cpu = first_cpu;
@@ -170,18 +185,31 @@ int virt_mem_write(CPUState *env, target_ulong pc, target_ulong addr, target_ulo
 		switch( (unsigned int)size )
 		{
 			case 1:
-				fprintf( out_file, "0x%02x\n", *(unsigned char *)buf );
+				fprintf( out_file, "0x%02x\n", *(unsigned char *)value );
 				break;
 			case 2:
-				fprintf( out_file, "0x%04x\n", *(unsigned short *)buf );
+				fprintf( out_file, "0x%04x\n", *(unsigned short *)value );
 				break;
 			case 4:
-				fprintf( out_file, "0x%08x\n", *(unsigned int *)buf );
+				fprintf( out_file, "0x%08x\n", *(unsigned int *)value );
 				break;
 			case 8:
-				fprintf( out_file, "0x%08x", *(unsigned int *)buf );
-				fprintf( out_file, "%08x\n", *( ((unsigned int *)buf) + 1 ) );
+				fprintf( out_file, "0x%08x", *(unsigned int *)value );
+				fprintf( out_file, "%08x\n", *( ((unsigned int *)value) + 1 ) );
 				break;
+		}
+
+		if(near_bytes)
+		{
+			panda_virtual_memory_read(env, value-near_bytes, near_bytes_buf, near_bytes*2);
+			fprintf( out_file, "%lli:0x%08x:0x%x [0x%08x]: ", 
+				ins_count,
+				(unsigned int)pc,
+				( (struct X86CPU *)cpu )->thread_id,
+				(unsigned int) (addr-near_bytes) );
+			for(unsigned int i = 0; i < near_bytes*2; i++)
+				fprintf( out_file, "%02X", *(unsigned char *)(value-near_bytes+i) );
+			fprintf(out_file, "\n");
 		}
 	}
 #endif
@@ -200,19 +228,22 @@ bool init_plugin(void *self)
 	panda_enable_memcb();
 	panda_enable_precise_pc();
 
-	out_file_name = panda_parse_string_opt(args, "outfile", "trace.txt", "output filename, where will be store trace information in humanable form");
+	out_file_name = panda_parse_string_opt(args, "outfile", "trace.log", "output filename, where will be store trace information in humanable form");
 	asid = panda_parse_uint64_opt(args, "asid", 0, "only this CR3 (default all address spaces)");
 	from = panda_parse_uint64_opt(args, "from", 0, "start address for tracing");
 	to = panda_parse_uint64_opt(args, "to", 0, "end address for tracing");
+	near_bytes = panda_parse_uint64_opt(args, "near_bytes", 0, "show bytes near from memory access");
 	if(asid)
 		printf("[+] selected CR3=0x%lx\n", asid);
 	if(from || to)
 		printf("[+] from: 0x%08lx, to: 0x%08lx\n", from, to);
+	if(near_bytes)
+		near_bytes_buf = malloc(near_bytes*2);
 
 	out_file = fopen(out_file_name, "w");
-	fprintf(out_file, "TAKT:EIP:THREAD_ID {OPCODE} EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI\n");
-	fprintf(out_file, "TAKT:EIP:THREAD_ID [MEMORY] -> READED_VALUE\n");
-	fprintf(out_file, "TAKT:EIP:THREAD_ID [MEMORY] <- WRITED_VALUE\n");
+	fprintf(out_file, "[#] TAKT:EIP:THREAD_ID {OPCODE} EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI\n");
+	fprintf(out_file, "[#] TAKT:EIP:THREAD_ID [MEMORY] -> READED_VALUE\n");
+	fprintf(out_file, "[#] TAKT:EIP:THREAD_ID [MEMORY] <- WRITED_VALUE\n");
 
 	pcb.insn_translate = translate_callback;
 	panda_register_callback(self, PANDA_CB_INSN_TRANSLATE, pcb);
