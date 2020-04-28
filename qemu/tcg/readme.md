@@ -1,3 +1,5 @@
+Speed: 20M/s
+
 ## build qemu-tcg
 
 git clone https://github.com/atos-tools/qemu && cd qemu
@@ -8,9 +10,8 @@ make CFLAGS='-g -w'
 
 ## build module
 
-cp test.c path/to/qemu/tcg/plugins/
+cp trace.c path/to/qemu/tcg/plugins/trace2.c
 
-make M=tcg LDFLAGS='-lcapstone -shared'
+make M=tcg CFLAGS='-w' LDFLAGS='-lcapstone -shared'
 
-path/to/qemu/x86_64-softmmu/qemu-system-x86_64 -hda disk.qcow2 --tcg-plugin test
-
+QEMU_CR3=$[0x0b028300] ./x86_64-softmmu/qemu-system-x86_64 -hda os.qcow2 --tcg-plugin trace2
